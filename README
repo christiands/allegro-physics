@@ -23,3 +23,10 @@ Friction, so the ball doesn't bounce everywhere
 
 Contributing:
 If someone can suggest ways to clean up the code, I would be grateful.
+
+Compiling:
+I use clang, so the command looks like:
+clang alp_b.c -lallegro -lallegro_image -lallegro_font
+
+Make sure you have Allegro 5 installed, and zlib and libpng if allegro_image won't render images
+I use Arch, but you should be able to figure out what you need with a bit of web searching.
