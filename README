@@ -1,0 +1,25 @@
+Allegro Physics:
+Some random code I wrote to grasp basic 2D physics
+This code isn't perfectly optimized, and my use of pointers and such isn't perfect
+I'll clean it up later, but it works for now
+
+File names:
+alp_b.c - allegro-physics bouncing ball simulation
+
+Some future plans:
+alp_p - allegro-physics 'pong', utilizing the physics done in alp_b
+alp_f - allegro-physics 'friction', alp_b with a larger emphasis on friction equations
+
+alp_b is unfinished for now, but the math works well enough to simulate a ball falling, without collision or terminal velocity.
+
+Some things I hope to get done with alp_b:
+Horizontal acceleration, so I can have the ball fall in an arc and such
+Bouncing, so the ball can bounce around the border
+Collision based on prop size, so the edge of the ball bounces instead of 0,0 on the bitmap
+Reset without closing the window
+Change of acceleration constants without closing the window
+Change of drop position without recompiling
+Friction, so the ball doesn't bounce everywhere
+
+Contributing:
+If someone can suggest ways to clean up the code, I would be grateful.
