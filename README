@@ -10,11 +10,11 @@ Some future plans:
 alp_p - allegro-physics 'pong', utilizing the physics done in alp_b
 alp_f - allegro-physics 'friction', alp_b with a larger emphasis on friction equations
 
-alp_b is unfinished for now, but the math works well enough to simulate a ball falling, without collision or terminal velocity.
+alp_b is 90% finished, but still needs some friction simulations for gravity, right now it just bounces around in it's container.
 
 Some things I hope to get done with alp_b:
 [DONE] Horizontal acceleration, so I can have the ball fall in an arc and such
-[DONE]Bouncing, so the ball can bounce around the border
+[DONE] Bouncing, so the ball can bounce around the border
 Collision based on prop size, so the edge of the ball bounces instead of 0,0 on the bitmap
 Reset without closing the window
 Change of acceleration constants without closing the window
