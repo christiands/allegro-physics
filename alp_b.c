@@ -7,7 +7,8 @@
 #define ACRS_C 1.0f /* Across movement constant */
 #define REFR_R 60.0f /* Refresh rate */
 #define FRIC_C 2.1f /* Friction coefficient */
-#define TERM_V 250.0f /* Terminal velocity */
+#define TERM_VX 10.0f /* Terminal velocity */
+#define TERM_VY 25.0f
 
 #define WIN_H 720 /* Window height */
 #define WIN_L 1280 /* Window length */
@@ -43,8 +44,15 @@ typedef struct
 
 typedef struct
 {
+	float x;
+	float y;
+} VELOCITY;
+
+typedef struct
+{
 	COORD c;
 	DIRECTION d;
+	VELOCITY v;
 } VECTOR;
 
 ALLEGRO_TIMER *ti;
@@ -64,7 +72,7 @@ int64_t drop_ttx = 0; /* Drop timer temporary */
 int64_t drop_sty = 0; /* Drop timer start */
 int64_t drop_tty = 0; /* Drop timer temporary */
 
-COORD accel_calc(VECTOR curr, float accel_con, float acrss_con, float drop_tx, float drop_ty);
+VECTOR accel_calc(VECTOR curr, float accel_con, float acrss_con, float drop_tx, float drop_ty);
 VECTOR coll_lgc(VECTOR curr, int bord_l, int bord_r, int bord_t, int bord_b, int wind_h, int wind_l, int ball_h, int ball_l); /* Returns a correction if true */
 
 void res_t(char axis); /* Reset acceleration timer */
@@ -73,20 +81,20 @@ int init_b(); /* Initialize bitmaps */
 int dest_a(); /* Destroy add-ons */
 int dest_b(); /* Destroy bitmaps */
 
-COORD accel_calc(VECTOR curr, float accel_con, float acrss_con, float drop_tx, float drop_ty)
+VECTOR accel_calc(VECTOR curr, float accel_con, float acrss_con, float drop_tx, float drop_ty)
 {
-	COORD t;
-	float vel_x = (acrss_con * curr.d.x) * drop_tx; /* Velocity */
-	float vel_y = (acrss_con * curr.d.y) * drop_ty; /* v = a * s * d */
+	VECTOR t = curr;
+	t.v.x = (acrss_con * t.d.x) * drop_tx; /* Velocity */
+	t.v.y = (accel_con * t.d.y) * drop_ty; /* v = a * s * d */
 
-	if((vel_x * curr.d.x) > TERM_V)
-		vel_x = (TERM_V * curr.d.x);
+	if((t.v.x * t.d.x) > TERM_VX)
+		t.v.x = (TERM_VX * t.d.x);
 
-	if((vel_y * curr.d.y) > TERM_V)
-		vel_y = (TERM_V * curr.d.y);
+	if((t.v.y * t.d.y) > TERM_VY)
+		t.v.y = (TERM_VY * t.d.y);
 
-	t.x = (curr.c.x + vel_x);
-	t.y = (curr.c.y + vel_y);
+	t.c.x = (t.c.x + t.v.x);
+	t.c.y = (t.c.y + t.v.y);
 
 	return t;
 }
@@ -242,6 +250,8 @@ int main(void)
 	b.c.y = BLL_SY;
 	b.d.x = BLL_SDH;
 	b.d.y = BLL_SDV;
+	b.v.x = 0;
+	b.v.y = 0;
 
 	ALLEGRO_EVENT ev;
 	al_start_timer(ti);
@@ -300,13 +310,13 @@ int main(void)
 				drop_scy = ((float)drop_diy) / REFR_R;
 
 				b = coll_lgc(b, BDR_L, BDR_R, BDR_T, BDR_B, WIN_H, WIN_L, BLL_H, BLL_L);
-				b.c = accel_calc(b, GRAV_C, ACRS_C, drop_scx, drop_scy);
+				b = accel_calc(b, GRAV_C, ACRS_C, drop_scx, drop_scy);
 			}
 
 			al_clear_to_color(al_map_rgb(160, 160, 160));
 			al_draw_bitmap(bg, 0, 0, 0);
 			al_draw_bitmap(bl, b.c.x, b.c.y, 0);
-			al_draw_textf(fn, al_map_rgb(255, 255, 255), 0, 0, 0, "ball_x: %f | ball_y: %f | time(x): %fs | time(y): %fs | vel(x): %fp/s | vel(y): %fp/s | drop: %d | scroll: %d", b.c.x, b.c.y, drop_scx, drop_scy, (ACRS_C * drop_scx) * b.d.x, (GRAV_C * drop_scy) * b.d.y, drop, slow);
+			al_draw_textf(fn, al_map_rgb(255, 255, 255), 0, 0, 0, "time(x): %fs | time(y): %fs | vel(x): %fp/s | vel(y): %fp/s | drop: %d | scroll: %d", drop_scx, drop_scy, b.v.x, b.v.y, drop, slow);
 			al_draw_textf(fn, al_map_rgb(255, 255, 255), 0, WIN_H - 10, 0, "b.c.x: %f | b.c.y: %f | b.d.x: %d | b.d.y: %d", b.c.x, b.c.y, b.d.x, b.d.y);
 			al_flip_display();
 
