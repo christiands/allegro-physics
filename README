@@ -14,7 +14,7 @@ alp_b is unfinished for now, but the math works well enough to simulate a ball f
 
 Some things I hope to get done with alp_b:
 [DONE] Horizontal acceleration, so I can have the ball fall in an arc and such
-[DONE]Bouncing, so the ball can bounce around the border
+[DONE] Bouncing, so the ball can bounce around the border
 Collision based on prop size, so the edge of the ball bounces instead of 0,0 on the bitmap
 Reset without closing the window
 Change of acceleration constants without closing the window
