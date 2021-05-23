@@ -4,8 +4,10 @@
 */
 
 #define GRAV_C 9.8f /* Gravitational constant */
+#define ACRS_C 1.0f /* Across movement constant */
 #define REFR_R 60.0f /* Refresh rate */
 #define FRIC_C 2.1f /* Friction coefficient */
+#define TERM_V 250.0f /* Terminal velocity */
 
 #define WIN_H 720 /* Window height */
 #define WIN_L 1280 /* Window length */
@@ -16,9 +18,11 @@
 #define BDR_B 20 /* Bottom border offset*/
 
 #define BLL_L 128 /* Ball length */
-#define BLL_W 128 /* Ball width */
+#define BLL_H 128 /* Ball height */
 #define BLL_SX 100 /* Ball starting point */
 #define BLL_SY 100
+#define BLL_SDH 1 /* Ball starting direction */
+#define BLL_SDV 1
 
 #include <stdio.h>
 #include <allegro5/allegro.h>
@@ -31,6 +35,18 @@ typedef struct
 	float y;
 } COORD;
 
+typedef struct
+{
+	int x; /* 1 if heading right, -1 if heading left */
+	int y; /* 1 if heading down, -1 if heading top */
+} DIRECTION;
+
+typedef struct
+{
+	COORD c;
+	DIRECTION d;
+} VECTOR;
+
 ALLEGRO_TIMER *ti;
 ALLEGRO_EVENT_QUEUE *qe;
 ALLEGRO_DISPLAY *ds;
@@ -41,48 +57,89 @@ ALLEGRO_BITMAP *bl;
 
 ALLEGRO_FONT *fn;
 
-int scroll = 0;
+int slow = 0; /* Slows the ball down on bounce, requiring reacceleration */
 
-// COORD boun_calc(float accel, float time_fl, float frict, int x_dir, int y_dir);
-COORD coll_chk(float x, float y); /* Returns a correction if true */
+int64_t drop_stx = 0; /* Drop timer start */
+int64_t drop_ttx = 0; /* Drop timer temporary */
+int64_t drop_sty = 0; /* Drop timer start */
+int64_t drop_tty = 0; /* Drop timer temporary */
+
+COORD accel_calc(VECTOR curr, float accel_con, float acrss_con, float drop_tx, float drop_ty);
+VECTOR coll_lgc(VECTOR curr, int bord_l, int bord_r, int bord_t, int bord_b, int wind_h, int wind_l, int ball_h, int ball_l); /* Returns a correction if true */
+
+void res_t(char axis); /* Reset acceleration timer */
 int init_a(); /* Initialize add-ons */
 int init_b(); /* Initialize bitmaps */
 int dest_a(); /* Destroy add-ons */
 int dest_b(); /* Destroy bitmaps */
 
-COORD accel_calc(float x, float y, float accel_con, float drop_t)
+COORD accel_calc(VECTOR curr, float accel_con, float acrss_con, float drop_tx, float drop_ty)
 {
 	COORD t;
-	
-	y = y + (accel_con * drop_t);
+	float vel_x = (acrss_con * curr.d.x) * drop_tx; /* Velocity */
+	float vel_y = (acrss_con * curr.d.y) * drop_ty; /* v = a * s * d */
 
-	t.x = x;
-	if(y > WIN_H && scroll)
-		t.y = (float)((int)y % WIN_H);
-	else
-		t.y = y;
+	if((vel_x * curr.d.x) > TERM_V)
+		vel_x = (TERM_V * curr.d.x);
+
+	if((vel_y * curr.d.y) > TERM_V)
+		vel_y = (TERM_V * curr.d.y);
+
+	t.x = (curr.c.x + vel_x);
+	t.y = (curr.c.y + vel_y);
+
 	return t;
 }
 
-COORD coll_chk(float x, float y)
+VECTOR coll_lgc(VECTOR curr, int bord_l, int bord_r, int bord_t, int bord_b, int wind_h, int wind_l, int ball_h, int ball_l)
 {
-	COORD t;
+	VECTOR t = curr;
 
-	if(x < BDR_L)
-		x = BDR_L;
+	if(curr.c.x < bord_l) /* Left side collision */
+	{
+		t.c.x = bord_l;
+		t.d.x = 1;
+		if(slow)
+			res_t('x');
+	}
+	else if(curr.c.x > wind_l - bord_r - ball_l) /* Right side collision */
+	{
+		t.c.x = wind_l - bord_r - ball_l;
+		t.d.x = -1;
+		if(slow)
+			res_t('x');
+	}
 
-	if(x > WIN_L - BDR_R)
-		x = WIN_L - BDR_R;
+	if(curr.c.y < bord_t) /* Top collision */
+	{
+		t.c.y = bord_t;
+		t.d.y = 1;
+		if(slow)			
+			res_t('y');
+	}
+	else if(curr.c.y > wind_h - bord_b - ball_h) /* Bottom collision */
+	{	
+		t.c.y = wind_h - bord_b - ball_h;
+		t.d.y = -1;
+		if(slow)
+			res_t('y');
+	}
 
-	if(y < BDR_T)
-		y = BDR_T;
-
-	if(y > WIN_H - BDR_B)
-		y = WIN_H - BDR_B;
-
-	t.x = x;
-	t.y = y;
 	return t;
+}
+
+void res_t(char axis)
+{
+	if(axis == 'x')
+	{
+		drop_stx = al_get_timer_count(ti);
+		drop_ttx = al_get_timer_count(ti);
+	}
+	else if(axis == 'y')
+	{
+	drop_sty = al_get_timer_count(ti);
+	drop_tty = al_get_timer_count(ti);
+	}
 }
 
 int init_a()
@@ -175,13 +232,16 @@ int main(void)
 	int redraw = 1;
 
 	int drop = 0;
-	int64_t drop_st = 0; /* Drop timer start */
-	int64_t drop_tt = 0; /* Drop timer temporary */
-	int64_t drop_di = 0; /* Drop timer diff */
-	float drop_sc = 0; /* Drop second count */
-	COORD b; /* Ball coordinates */
-	b.x = BLL_SX;
-	b.y = BLL_SY;
+	int64_t drop_dix = 0; /* Drop timer diff */
+	int64_t drop_diy = 0; /* Drop timer diff */
+	float drop_scx = 0; /* Drop second count */
+	float drop_scy = 0; /* Drop second count */
+
+	VECTOR b; /* Ball vector */
+	b.c.x = BLL_SX;
+	b.c.y = BLL_SY;
+	b.d.x = BLL_SDH;
+	b.d.y = BLL_SDV;
 
 	ALLEGRO_EVENT ev;
 	al_start_timer(ti);
@@ -201,18 +261,24 @@ int main(void)
 			case ALLEGRO_EVENT_KEY_DOWN:
 				if(ev.keyboard.keycode == ALLEGRO_KEY_D)
 				{
-					drop_st = al_get_timer_count(ti);
-					drop_tt = al_get_timer_count(ti);
-					drop = 1;
+					drop_stx = al_get_timer_count(ti);
+					drop_ttx = al_get_timer_count(ti);
+					drop_sty = al_get_timer_count(ti);
+					drop_tty = al_get_timer_count(ti);
+
+					if(!drop)
+						drop = 1;
+					else
+						drop = 0;
 				}
 				if(ev.keyboard.keycode == ALLEGRO_KEY_ESCAPE)
 					done = 1;
 				if(ev.keyboard.keycode == ALLEGRO_KEY_S)
 				{
-					if(!scroll)
-						scroll = 1;
+					if(!slow)
+						slow = 1;
 					else
-						scroll = 0;
+						slow = 0;
 				}
 				break;
 		}
@@ -224,16 +290,24 @@ int main(void)
 		{
 			if(drop)
 			{
-				drop_tt = al_get_timer_count(ti);
-				drop_di = drop_tt - drop_st;
-				drop_sc = ((float)drop_di) / REFR_R;
-				b = accel_calc(b.x, b.y, GRAV_C, drop_sc);
+				drop_ttx = al_get_timer_count(ti);
+				drop_tty = al_get_timer_count(ti);
+
+				drop_dix = drop_ttx - drop_stx;
+				drop_diy = drop_tty - drop_sty;
+
+				drop_scx = ((float)drop_dix) / REFR_R;
+				drop_scy = ((float)drop_diy) / REFR_R;
+
+				b = coll_lgc(b, BDR_L, BDR_R, BDR_T, BDR_B, WIN_H, WIN_L, BLL_H, BLL_L);
+				b.c = accel_calc(b, GRAV_C, ACRS_C, drop_scx, drop_scy);
 			}
 
 			al_clear_to_color(al_map_rgb(160, 160, 160));
 			al_draw_bitmap(bg, 0, 0, 0);
-			al_draw_bitmap(bl, b.x, b.y, 0);
-			al_draw_textf(fn, al_map_rgb(255, 255, 255), 0, 0, 0, "ball_x: %f | ball_y: %f | time: %fs | speed: %fp/s | scroll: %d", b.x, b.y, drop_sc, GRAV_C * drop_sc, scroll);
+			al_draw_bitmap(bl, b.c.x, b.c.y, 0);
+			al_draw_textf(fn, al_map_rgb(255, 255, 255), 0, 0, 0, "ball_x: %f | ball_y: %f | time(x): %fs | time(y): %fs | vel(x): %fp/s | vel(y): %fp/s | drop: %d | scroll: %d", b.c.x, b.c.y, drop_scx, drop_scy, (ACRS_C * drop_scx) * b.d.x, (GRAV_C * drop_scy) * b.d.y, drop, slow);
+			al_draw_textf(fn, al_map_rgb(255, 255, 255), 0, WIN_H - 10, 0, "b.c.x: %f | b.c.y: %f | b.d.x: %d | b.d.y: %d", b.c.x, b.c.y, b.d.x, b.d.y);
 			al_flip_display();
 
 			redraw = 0;
