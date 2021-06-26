@@ -28,5 +28,13 @@ Compiling:
 I use clang, so the command looks like:
 clang alp_b.c -lallegro -lallegro_image -lallegro_font
 
+For MinGW (godly program), you have to follow the Allegro tutorial at https://liballeg.org/stabledocs/en/build/mingw32.html. Once you do that compile with:
+
+gcc alp_b.c -lallegro-5.0.10-monolith-md
+
+You have to put the DLL in the same folder (or somewhere else, I have no clue how DLLs work, they just do), and then the EXE should run.
+The Linux binary compiles statically, but the Windows one is dynamic, which requires the DLL. I'm sure its possible to do it fully static, but the Windows libraries that Allegro requires to compile statically won't work for me.
+You can change the object file that gcc uses if needed.
+
 Make sure you have Allegro 5 installed, and zlib and libpng if allegro_image won't render images
 I use Arch, but you should be able to figure out what you need with a bit of web searching.
