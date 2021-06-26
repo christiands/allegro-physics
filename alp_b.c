@@ -30,11 +30,21 @@
 #include <allegro5/allegro_image.h>
 #include <allegro5/allegro_font.h>
 
+#ifdef __MINGW32__
+
+typedef struct
+{
+	float x;
+	float y;
+} WCOORD;
+
+#else
 typedef struct
 {
 	float x;
 	float y;
 } COORD;
+#endif
 
 typedef struct
 {
@@ -50,7 +60,11 @@ typedef struct
 
 typedef struct
 {
+#ifdef __MINGW32__
+	WCOORD c;
+#else
 	COORD c;
+#endif
 	DIRECTION d;
 	VELOCITY v;
 } VECTOR;
@@ -240,8 +254,13 @@ int main(void)
 	int redraw = 1;
 
 	int drop = 0;
+#ifdef __linux__
 	int64_t drop_dix = 0; /* Drop timer diff */
 	int64_t drop_diy = 0; /* Drop timer diff */
+#elif __MINGW32__
+	long drop_dix = 0; /* Drop timer diff */
+	long drop_diy = 0; /* Drop timer diff */
+#endif
 	float drop_scx = 0; /* Drop second count */
 	float drop_scy = 0; /* Drop second count */
 
